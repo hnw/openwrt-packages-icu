@@ -1,0 +1,52 @@
+sudo: required
+language: c
+services: docker
+cache: ccache
+
+env:
+  global:
+    - IMG=yhnw/openwrt-sdk
+    - PKG_NAME=icu
+  matrix:
+    - DISTRO=15.05.1 ARCH=ar71xx PKG_DIR=bin/ar71xx/packages
+
+before_install:
+  - docker version
+  - du -s $HOME/.ccache
+
+script:
+  - docker run --rm -u openwrt -v $PWD:/work -v $HOME/.ccache:/home/openwrt/.ccache $IMG:${DISTRO}-${ARCH} /bin/sh /work/build.sh ${DISTRO}-${ARCH} $PKG_DIR $PKG_NAME
+  - ls -la
+  - du -s $HOME/.ccache
+
+before_deploy:
+  - if [ -n "$TRAVIS_TAG" ]; then
+      export VERSION=stable;
+      export VCS_TAG="$TRAVIS_TAG";
+      export DESC="Stable release";
+      export UPLOAD_DIR_SUFFIX=;
+    else
+      export VERSION=develop;
+      export VCS_TAG=HEAD;
+      export DESC="Development snapshot";
+      export UPLOAD_DIR_SUFFIX=-dev;
+    fi
+  - RELEASED=$(date +%Y-%m-%d) envsubst < descriptor.json.in > descriptor.json
+  - cat descriptor.json
+
+deploy:
+  - provider: bintray
+    file: "descriptor.json"
+    user: hnw
+    key:
+      secure: "fuxQ2ECzUeAFaElD8AgaEbdTITMiaLeh9Mt3P299HsaZoYqK+uGLGonI7rTLkyUMtWov2WaVZWiEeS/AsjsCIp1hhvoNBOxFjnKvclZMkTEnVYVgoMcZqUuXgZJGVV1Ti70hPOWmnU4gDkja1KDt+zGag8DJXMUK1lqJoOxS37M7yYk+7KU3h/AYCxKJh5L0fpQpGMA3MOmXcL0CNX7xRHtzvSkL6/GfAa/ltWXo/AvwYhcX3DIlEExJpwaiRJhYZcx5yiQ6j0U/PQEw8TF2CLQ6o5/lMk84Xb3fjdCneLI538SK95F71bzc1cj3kIsJ08qKVcC/IexLJaZcjkiQ2T17m/4E/Y14RkoXy3qC2xKuAC3nlBaAFxtTvc8lV3xUMtIbdyTYS+WnkqntzOXkd8xBaGzpi8SlMqEOl2QdEtwRaia11fpAuTVfoUIkM9WpwDjwLLCZO13lHfONmlA2gnz6oBL0MHmoUlFkgZaFOXCJe55y3fN9hI3FzrZNg/dApnApYcsUoCdnB8YpzfdmEbGiA0FMHE2syD8IgS+YzCA7hfSPBlK5KzL3NlqJyQrJAdyL4PTbW9UrC1ENaEtGSnWkRkzwe5CLKjvXJhv5mKmWr5B5SdXNb2Nfr1fd4VnJZU9AnwdZQWZU7Ej8uuPc9v4p7/mx4F/KNh/K3FmKk2M="
+    on:
+      all_branches: true
+  - provider: releases
+    api_key:
+      secure: "dzm9d9bdXWjDuKw8QdoINpayJKqB838i7w26BQn+4Kc4OBD+rqoinQ86rgtFhXbbtXovZI3Xa8uUvtse4F76eFSHSbIuU/7EcHQE41bv9LTvDNkBtl8IKOjud9s4io0Crad+oF0/G6hhIy3ywkbgAlWeO4Q/OdJIL8F6xtE04gSEErCcL6pishG2JrJg+sCAB4wP2xlTpjhoF6o+P8RZa/aoITi2pZFxKSfe4AeTRd92H8imzuFSpegTharTeykTCAAOIpnmEhR04xHaHFSyG8JjO2HUd/fgZ1PiaVIODhAFVlfcFZjVFJB1PF0r+dvaOU1zephKxpmZfMxshKtDKba3n6381ltnU8pdG3BsM4ZBHn7qVU2k6B+Q6wjPncIn2xDz9snWd2eAeUdJh04TJ1WU9IVSPHmKpXktl2p7SbEGTOxjd9sg3oGFbuyfTRsEU5lctKj8+ghA66fHrDpkqp4rZEORYoGC+ymj4Bpogr/aEpgA5u44VI1kUM0EVNmwkdJnqSBT6p45eCk+tkzenDUZGe4RON2VgZE2oXwG+mjhwukV0tWRydoFJLh/W5MMywTUGbgcfs0sYAlx6XhzUZmXRKbK4rVd4Pm6v3oozKfVMQcBxU8Avkk8e5SoNWacLa3oD8z2UNmcHhl9z3QTLvXI6SGPm0B+AymmebWlE/0="
+    file_glob: true
+    file: "pkgs-for-github/*.ipk"
+    skip_cleanup: true
+    on:
+      tags: true
