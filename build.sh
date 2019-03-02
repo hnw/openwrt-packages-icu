@@ -6,10 +6,6 @@ PKGS=$3
 QUIET=${4-}
 FEED_NAME=custom
 
-for dir in /home/openwrt/sdk/staging_dir/*; do
-    ln -snf /home/openwrt/.ccache $dir/ccache
-done
-
 cd /home/openwrt/sdk
 rm -rf bin
 cp feeds.conf.default feeds.conf
@@ -21,9 +17,22 @@ make defconfig
 # To bypass travis-ci 10 minutes build timeout
 [[ -n "$QUIET" ]] && while true; do echo "..."; sleep 60; done &
 
-for pkg in $PKGS; do
+for pkg in toolchain $PKGS; do
+    for dir in /home/openwrt/sdk/staging_dir/*; do
+	if [[ ! -L "$dir/ccache" ]]; then
+	    if [[ -e "$dir/ccache" ]] ; then
+		mv "$dir/ccache" "$dir/ccache.orig"
+	    fi
+	    ln -s /home/openwrt/.ccache "$dir/ccache"
+	fi
+	ls -lad "$dir/ccache"
+    done
     echo make package/$pkg/compile V=s
-    make package/$pkg/compile V=s >> /work/build.log 2>&1
+    if [[ -n "$QUIET" ]]; then
+	make package/$pkg/compile V=s >> /work/build.log 2>&1
+    else
+	make package/$pkg/compile V=s
+    fi
 done
 
 [[ -n "$QUIET" ]] && kill %1
